@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>logic_homework1</title>
+    <h2>判断公式可满足与判断完全集</h2>
+    
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <script type="text/javascript">
+        "use strict";
+        var result_html_id = "result" // result 输出位置
+        var maxvarnr = 0; // 为了 rename_vars_in_formula
+        var printlen = 0; // 打印的时候使用
+        var printlst = []; // 打印的时候使用
+        var printarray = []; // 打印真值表的时候使用
+		
+		
+		
+		
+        /*=========================判断公式可满足=======================*/
+        function judge_formula(txt) {
+            clear_output();
+            var res, sharp_pos;
+            txt = trim(txt);
+            if (!txt) {
+            alert("没有输入!");
+			
+                return;
+            }
+            //判断当前自定义逻辑联结词状态
+            sharp_pos = sharp_position(txt);
+            if (sharp_pos == 0) {
+                show_result("请输入命题逻辑公式");
+                return;
+            } 
+			else if (sharp_pos == txt.length) {
+                console.group("请自定义联结词");
+				
+				
+                var  pos, tmp, exp, res;
+                //根据公式建立树
+                tmp = parse_expression_tree(txt,[], 0);
+                if (err_data(tmp)) {
+                    show_result(tmp[1]);
+                    return;
+                }
+                exp = tmp[0];
+                pos = tmp[1];
+                tmp = parse_skip(txt,pos);
+				
+                if(tmp<txt.length){
+                    show_result("多余字符："+txt.substring(pos));
+                }
+                console.log(exp);
+                //得出真值表，或者为永真，永假
+                res=print_truthtable_customized(exp,customized);
+                if(err_data(res)){
+                    show_result(res[1]);
+                }else{
+                    show_result("<tt>"+res.replace(/\n/g,"<br>")+"</tt>");
+                }
+                console.groupEnd();
+            }
+			else { //存在自定义联结词
+                var formula, customized, pos, tmp, exp;
+                formula = txt.substring(0, sharp_pos);//公式部分
+                customized = txt.substring(sharp_pos + 1, txt.length);//联接词定义部分
+                //分析自定义逻辑联结词
+                customized = split_customized(customized);
+                if (err_data(customized)) {
+                    show_result(customized[1]);
+                    return;
+                }
+                //根据公式建立树
+                tmp = parse_expression_tree(formula, customized, 0);
+                if (err_data(tmp)) {
+                    show_result(tmp[1]);
+                    return;
+                }
+                exp = tmp[0];
+                pos = tmp[1];
+                tmp = parse_skip(formula,pos);
+                if(tmp<formula.length){
+                    show_result("多余字符："+formula.substring(pos));
+                }
+                // //得出真值表
+                // 大部分不需要进行修改，只需要在op判断加上customized即可
+                res=print_truthtable_customized(exp,customized);
+                if(err_data(res)){
+                    show_result(res[1]);
+                }else{
+                    show_result("<tt>"+res+"</tt>");
+                }
+                console.groupEnd();
+            }
+        }
+
+
+        /*=========================判断完全集=======================*/
+  
+
+
+        function judge_complete_set(customized) {
+            clear_output();
+            
+            var conjuction_truth = {"¬":"10", "∧":"0001", "∨":"0111", "→":"1101", "⊕":"1001", "↔":"1001"};
+          
+            var nline = String.fromCharCode(10);
+            var block = customized.split(nline);
+            var define_pos = customized.indexOf('#');
+            var unread_pos = customized.indexOf('%');
+            var logic_str = "";
+            var define_str = "";
+            if (define_pos >= 0 && unread_pos<0) {
+                define_str = customized.substring(define_pos, customized.length);
+                logic_str = customized.substring(0, define_pos);
+            }
+            else if(define_pos >= 0 && unread_pos > define_pos){
+                define_str = customized.substring(define_pos, unread_pos);
+                logic_str = customized.substring(0, define_pos);
+            }
+
+  
+            var define_op_list = [];
+            var define_operation = {};
+            var define_var_num = {};
+            if (define_str != "") {
+                define_str = define_str.substring(1, define_str.length);
+                var pos = 0;
+                var state = 0;
+                var key = "";
+                var value = "";
+                var len = 0;
+                var num = 0;
+                var no_error = true;
+                var error_type = "";
+                var have_num = false;
+                while (pos < define_str.length && no_error) {
+                    if (state == 0) {
+                        if (define_str[pos] >= 'A' && define_str[pos] <= 'Z' || define_str[pos] >= 'a' && define_str[pos] <= 'z') {
+                            state = 1;
+                            num = 0;
+                            key = "";
+                            value = "";
+                            len = 0;
+                            have_num = false;
+                        }
+                        else if(define_str[pos] != " " && define_str[pos]!='#'){
+                            no_error = false;
+                            error_type = "自定义联接词错误,需从首位字母开始";
+                        }
+                    }
+                    if (state == 1){
+                        if (define_str[pos] == ' '){
+                            state = 2;
+                        } else if (define_str[pos] >= 'A' && define_str[pos] <= 'Z' || define_str[pos] >= 'a' && define_str[pos] <= 'z' || define_str[pos] >= '0' && define_str[pos] <= '9') {
+                            key += define_str[pos];
+                        } else {
+                            no_error = false;
+                            error_type = "函数名错误，字母和数字组成";
+                        }
+                    }
+                    else if (state == 2){
+                        if (define_str[pos] == ' ' && len != 0){
+                            if (len > 10){
+                                no_error = false;
+                                error_type = "新定义逻辑联词最大元数大于10，拒绝计算";
+                            }
+                            else{
+                                define_var_num[key] = len;
+                                len = Math.pow(2, len);
+                                state = 3;
+                            }
+                        }
+                        else if (define_str[pos] == ' ' && have_num == false){
+                            state = 2;
+                        }
+                        else if(have_num == false && define_str[pos] != ' ' && define_str[pos] >= '0' && define_str[pos] <= '9'){
+                            len = define_str[pos] - '0';
+                            have_num = true;
+                        }
+                        else if(have_num && define_str[pos] != ' ' && define_str[pos] >= '0' && define_str[pos] <= '9'){
+                            len = len * 10 + (define_str[pos] - '0');
+                        }
+                        else{
+                            no_error = false;
+                            error_type = "请定义元数个数为整形";
+                        }
+                    }
+                    else if (state == 3){
+                        if (define_str[pos] == '0' || define_str[pos] == '1'){
+                            value += define_str[pos];
+                            num += 1;
+                        }
+                        else if (define_str[pos] == ' '){
+                            state = 3;
+                        }
+                        else {
+                            no_error = false;
+                            error_type = "新定义逻辑联结词的真值表的最后一列错误";
+                        }
+                        if(num == len){
+                            define_operation[key] = value;
+                            define_op_list.push(key);
+                            state = 0;
+                        }
+                    }
+                    pos += 1;
+                }
+            }
+            if (num != len) {
+                no_error = false;
+                error_type = "新定义逻辑联结词的真值表的最后一列数目错误";
+            }
+
+            if (no_error == false){
+                
+                show_result('<font color="red">' + error_type + '</font>');
+                return;
+            }
+            var logic_block;
+            if (logic_str != ""){
+                logic_block = logic_str.split(" ");
+            }
+            var var_list = ["0011","0101"];
+            var var_pos = new Array(16);
+            var var_gen = new Array(16);
+            var num_var_list = 2;
+            for (var i=0; i<var_pos.length; i++){
+                var_pos[i] = 0;
+            }
+            var_pos[3] = 1;
+            var_gen[3] = "p";
+            var_pos[5] = 1;
+            var_gen[5] = "q";
+
+            var len_var_list = var_list.length;
+            var begin_var_list = 0;
+            while (begin_var_list < len_var_list) {
+                for (var i = 0; i < define_op_list.length; i++) {
+                    var opt_name = define_op_list[i];
+                    var opt_func = define_operation[opt_name];
+                    var opt_var_num = define_var_num[opt_name];
+                    for (var j = begin_var_list; j < len_var_list; j++) {
+                        for (var z = 0; z < len_var_list; z++) {
+                            var result = pq_fun(var_list[j], var_list[z], opt_var_num, opt_func);
+                            var result_list = result[0];
+                            var result_gen_list = result[1];
+                            for (var ri = 0; ri < result_list.length; ri++) {
+                                var res_num = str2int(result_list[ri]);
+                                if (var_pos[res_num] == 0) {
+                                    var_pos[res_num] = 1;
+                                    var_list.push(result_list[ri]);
+                                    var_gen[res_num] = opt_name + '(' + result_gen_list[ri] + ')';
+                                    num_var_list += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                begin_var_list = len_var_list;
+                len_var_list = var_list.length;
+            }
+			
+            if (num_var_list == 16){
+                var output_text = "";
+                output_text += "完全集" + "<br>";
+				
+				for(var i=0;i<16;i++){
+					 output_text +=  opt_gen_str(var_gen, i) + "<br>";
+				}
+				output_text +=  "<br>";
+                output_text += '¬p↔' + opt_gen_str(var_gen, 12) + "<br>";
+                output_text += 'p→q↔' + opt_gen_str(var_gen, 13) + "<br>";
+                //document.getElementById("output-area").innerHTML = output_text;
+                show_result(output_text);
+            }
+            else {
+                var output_text = "";
+                output_text += "不是完全集" + "<br>";
+			    for(var i=0;i<16;i++){
+					if(var_pos[i]==1)
+					 output_text +=  opt_gen_str(var_gen, i) + "<br>";
+				}
+				output_text +=  "<br>";
+                //document.getElementById("output-area").innerHTML = output_text;
+                show_result(output_text);
+            }
+        }
+        
+        function judge_complete_set_return(customized) {
+            clear_output();
+            
+            var conjuction_truth = {"¬":"10", "∧":"0001", "∨":"0111", "→":"1101", "⊕":"1001", "↔":"1001"};
+          
+            var nline = String.fromCharCode(10);
+            var block = customized.split(nline);
+            var define_pos = customized.indexOf('#');
+            var unread_pos = customized.indexOf('%');
+            var logic_str = "";
+            var define_str = "";
+            if (define_pos >= 0 && unread_pos<0) {
+                define_str = customized.substring(define_pos, customized.length);
+                logic_str = customized.substring(0, define_pos);
+            }
+            else if(define_pos >= 0 && unread_pos > define_pos){
+                define_str = customized.substring(define_pos, unread_pos);
+                logic_str = customized.substring(0, define_pos);
+            }
+
+  
+            var define_op_list = [];
+            var define_operation = {};
+            var define_var_num = {};
+            if (define_str != "") {
+                define_str = define_str.substring(1, define_str.length);
+                var pos = 0;
+                var state = 0;
+                var key = "";
+                var value = "";
+                var len = 0;
+                var num = 0;
+                var no_error = true;
+                var error_type = "";
+                var have_num = false;
+                while (pos < define_str.length && no_error) {
+                    if (state == 0) {
+                        if (define_str[pos] >= 'A' && define_str[pos] <= 'Z' || define_str[pos] >= 'a' && define_str[pos] <= 'z') {
+                            state = 1;
+                            num = 0;
+                            key = "";
+                            value = "";
+                            len = 0;
+                            have_num = false;
+                        }
+                        else if(define_str[pos] != " " && define_str[pos]!='#'){
+                            no_error = false;
+                            error_type = "自定义联接词错误,需从首位字母开始";
+                        }
+                    }
+                    if (state == 1){
+                        if (define_str[pos] == ' '){
+                            state = 2;
+                        } else if (define_str[pos] >= 'A' && define_str[pos] <= 'Z' || define_str[pos] >= 'a' && define_str[pos] <= 'z' || define_str[pos] >= '0' && define_str[pos] <= '9') {
+                            key += define_str[pos];
+                        } else {
+                            no_error = false;
+                            error_type = "函数名错误，字母和数字组成";
+                        }
+                    }
+                    else if (state == 2){
+                        if (define_str[pos] == ' ' && len != 0){
+                            if (len > 10){
+                                no_error = false;
+                                error_type = "新定义逻辑联词最大元数大于10，拒绝计算";
+                            }
+                            else{
+                                define_var_num[key] = len;
+                                len = Math.pow(2, len);
+                                state = 3;
+                            }
+                        }
+                        else if (define_str[pos] == ' ' && have_num == false){
+                            state = 2;
+                        }
+                        else if(have_num == false && define_str[pos] != ' ' && define_str[pos] >= '0' && define_str[pos] <= '9'){
+                            len = define_str[pos] - '0';
+                            have_num = true;
+                        }
+                        else if(have_num && define_str[pos] != ' ' && define_str[pos] >= '0' && define_str[pos] <= '9'){
+                            len = len * 10 + (define_str[pos] - '0');
+                        }
+                        else{
+                            no_error = false;
+                            error_type = "请定义元数个数为整形";
+                        }
+                    }
+                    else if (state == 3){
+                        if (define_str[pos] == '0' || define_str[pos] == '1'){
+                            value += define_str[pos];
+                            num += 1;
+                        }
+                        else if (define_str[pos] == ' '){
+                            state = 3;
+                        }
+                        else {
+                            no_error = false;
+                            error_type = "新定义逻辑联结词的真值表的最后一列错误";
+                        }
+                        if(num == len){
+                            define_operation[key] = value;
+                            define_op_list.push(key);
+                            state = 0;
+                        }
+                    }
+                    pos += 1;
+                }
+            }
+            if (num != len) {
+                no_error = false;
+                error_type = "新定义逻辑联结词的真值表的最后一列数目错误";
+            }
+
+            if (no_error == false){
+                
+                show_result('<font color="red">' + error_type + '</font>');
+                return;
+            }
+            var logic_block;
+            if (logic_str != ""){
+                logic_block = logic_str.split(" ");
+            }
+            var var_list = ["0011","0101"];
+            var var_pos = new Array(16);
+            var var_gen = new Array(16);
+            var num_var_list = 2;
+            for (var i=0; i<var_pos.length; i++){
+                var_pos[i] = 0;
+            }
+            var_pos[3] = 1;
+            var_gen[3] = "p";
+            var_pos[5] = 1;
+            var_gen[5] = "q";
+
+            var len_var_list = var_list.length;
+            var begin_var_list = 0;
+            while (begin_var_list < len_var_list) {
+                for (var i = 0; i < define_op_list.length; i++) {
+                    var opt_name = define_op_list[i];
+                    var opt_func = define_operation[opt_name];
+                    var opt_var_num = define_var_num[opt_name];
+                    for (var j = begin_var_list; j < len_var_list; j++) {
+                        for (var z = 0; z < len_var_list; z++) {
+                            var result = pq_fun(var_list[j], var_list[z], opt_var_num, opt_func);
+                            var result_list = result[0];
+                            var result_gen_list = result[1];
+                            for (var ri = 0; ri < result_list.length; ri++) {
+                                var res_num = str2int(result_list[ri]);
+                                if (var_pos[res_num] == 0) {
+                                    var_pos[res_num] = 1;
+                                    var_list.push(result_list[ri]);
+                                    var_gen[res_num] = opt_name + '(' + result_gen_list[ri] + ')';
+                                    num_var_list += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                begin_var_list = len_var_list;
+                len_var_list = var_list.length;
+            }
+			
+            if (num_var_list == 16){
+                var output_text = "";
+                output_text += "完全集" + "<br>";
+				
+				for(var i=0;i<16;i++){
+					 output_text +=  opt_gen_str(var_gen, i) + "<br>";
+				}
+				output_text +=  "<br>";
+                output_text += '¬p↔' + opt_gen_str(var_gen, 12) + "<br>";
+                output_text += 'p→q↔' + opt_gen_str(var_gen, 13) + "<br>";
+                //document.getElementById("output-area").innerHTML = output_text;
+                return true;
+            }
+            else {
+                var output_text = "";
+                output_text += "不是完全集" + "<br>";
+			    for(var i=0;i<16;i++){
+					if(var_pos[i]==1)
+					 output_text +=  opt_gen_str(var_gen, i) + "<br>";
+				}
+				output_text +=  "<br>";
+                //document.getElementById("output-area").innerHTML = output_text;
+                return false;
+            }
+        }
+
+        
+		
+		
+
+        function parse_expression_tree(formula,customized, pos) { //¬,∧,∨,→,⊕,↔，构建表达式树
+            var result, isneg, exp, op, tmp, c;
+            
+            pos = parse_skip(formula, pos);
+            isneg = false;//是否有¬
+            if (parse_isatpos(formula, pos, "¬")) {//最前面是¬
+                isneg = true;
+                pos++;
+            }
+            tmp = parse_term_tree(formula,customized, pos);
+            if(err_data(tmp)) return tmp;
+            exp=tmp[0];
+            pos=tmp[1];
+            if (isneg) exp=["-",exp];
+            pos=parse_skip(formula,pos);
+            while(true){
+                op = null;
+                c = formula.charAt(pos);
+                console.log("op:"+c);
+                console.log("is op?:"+is_op(c));
+                if(is_op(c)){
+                    op = c;
+                    pos++;
+                }
+                if(op==null) break;
+                tmp = parse_term_tree(formula,customized,pos);
+                if(err_data(tmp)) return tmp;
+                exp=[op,exp,tmp[0]];
+                pos = tmp[1];
+                pos = parse_skip(formula,pos);
+                if(pos>=formula.length) break;
+            }
+            console.log("当前结果："+[exp,pos]);
+            console.groupEnd();
+            return [exp,pos];
+        }
+
+        function parse_term_tree(formula,customized, pos) {
+            console.group("parse_term_tree");
+            var c, n, v, tmp, exp, isneg;
+            var conj, pos_tmp, count_brackets, conj_exp, charge;
+			
+			
+            pos = parse_skip(formula, pos);
+            isneg = false;
+            if (parse_isatpos(formula, pos, "¬")) {
+                isneg = true;
+                pos++;
+                pos = parse_skip(formula, pos);
+            }
+            v = null;
+            tmp = isa_variable(formula,pos);
+
+            // conj = isa_variable(formula,pos);
+            
+            
+            if(!err_data(tmp)){
+                pos_tmp = tmp[1];
+                pos_tmp = parse_skip(formula,pos_tmp);
+				
+				
+                if(parse_isatpos(formula,pos_tmp,"(")){
+                    count_brackets =1;
+                    var i
+                    for(i=pos_tmp+1;i<formula.length;i++){
+                        if(formula[i]=='('){
+                            count_brackets++;
+                        }
+                        if(formula[i]==')'){
+                            count_brackets--;
+                        }
+                        if(count_brackets==0){
+                            break;
+                        }
+                    }
+                    if(count_brackets!=0){
+                        return parse_error("括号输入不正确");
+                    }
+                    conj_exp = conjunction2exp(formula.slice(pos,i+1));
+                    //在这里进行一个语法检查：去除所有的空格
+					//检测生成的树是否正确，自定义连结符是否都有定义，变元数是否满足要求
+                    conj_exp.forEach(function(key, index, array){
+                        if(typeof key==="object"&&conj_exp[index][0]===""){
+                            if(conj_exp[index].length===2){
+                                conj_exp[index]=conj_exp[index][1];
+                            }else{
+                                return (parse_error("自定义联结词内给定变元为空"));
+                            }
+                        }
+                    });
+                    charge = charge_customized(conj_exp,customized);
+                    if(err_data(charge)){
+                        return charge;
+                    }
+                    if(isneg) return [["-",conj_exp],i+1];
+                    return [conj_exp,i+1];
+                }
+                v = tmp[0];
+                pos = tmp[1];
+                if(isneg) return [["-",v],pos];
+                return [v,pos];
+
+            }
+            
+            //不是一个命题变元或者新定义联结词的时候
+            c = formula.charAt(pos);
+            n = formula.charCodeAt(pos);
+            console.log("第一类逻辑联结词？括号？"+c);
+            if(c=='0'||c=='1') {
+                pos++;
+                if(pos>=formula.length){
+                    if(isneg) return [["-",c],pos];
+                    return [c,pos];
+                }
+                tmp = formula.charAt(pos);
+                if(tmp==" "||tmp=="\t"||tmp=="\n"||tmp=="\r"||is_op(tmp)||tmp==")"){
+                    console.groupEnd();
+                    if(isneg) return [["-",c],pos];
+                    return [c,pos];
+                }
+                tmp = parse_error("0，1变元输入不正确！");
+                return tmp;
+            }else if (c === "(") {
+                console.log("左括号：");
+                pos++;
+                tmp = parse_expression_tree(formula,customized, pos);
+                if (err_data(tmp)) return tmp;
+                exp = tmp[0];
+                pos = tmp[1];
+                pos = parse_skip(formula, pos);
+                if (formula.charAt(pos) !== ")")
+                    return (parse_error("右括号缺失"));
+                pos++;
+                console.groupEnd();
+                if (isneg) return [
+                    ["-", exp], pos
+                ];
+                return [exp, pos];
+            } else if (c === ")") {
+                return (parse_error("额外右括号 " + formula.substring(pos)));
+            } else{
+                return (parse_error("命题变元或新定义联结词书写出错/出现非法字符：" + c + " 位于 " + formula.substring(pos)));
+            }
+        }
+        
+
+
+
+        /*=============================结果生成模块=============================*/
+        
+
+        // =========== 变量重命名 ===============
+
+        function rename_vars_in_formula(tree) {
+            var renamedvars = {},
+                origvars = [];
+            var res, tmp;
+            maxvarnr = 0;
+            if (typeof tree === "number" || typeof tree === "string") {
+                // 只有一个元素的树
+                return [1, 1, [0, tree]];
+            } else {
+                // 递归步骤：不仅仅只有一个元素的树
+                rename_vars_in_formula_aux(tree, origvars, renamedvars);
+                return [maxvarnr, tree, origvars];
+            }
+        }
+
+        function rename_vars_in_formula_aux(tree, origvars, renamedvars) {
+            var i, el, tmp;
+            for (i = 1; i < tree.length; i++) {
+                el = tree[i];
+                tmp = typeof el;
+                if (tmp === "number" || tmp === "string") {
+                    if (!renamedvars[el]) {
+                        maxvarnr++;
+                        renamedvars[el] = maxvarnr;
+                        origvars[maxvarnr] = el;
+                        tree[i] = maxvarnr;
+                    } else {
+                        tree[i] = renamedvars[el];
+                    }
+                } else {
+                    rename_vars_in_formula_aux(el, origvars, renamedvars);
+                }
+            }
+        }
+
+
+
+        // ============ 构建真值表 ===================
+        function print_truthtable_customized(exp, customized){
+            var tmp,count,frm,origvars,res;
+            if(!exp) return "";
+            tmp = rename_vars_in_formula_customized(exp);
+            count = tmp[0];
+            frm = tmp[1];
+            origvars = tmp[2];
+            res = truthtable_customized(frm,count,origvars,customized);
+            return res;
+        }
+        
+        function rename_vars_in_formula_customized(exp){
+            var renamedvars = {},
+                origvars = [];
+            var res, tmp;
+            maxvarnr = 0;//全局使用
+            if(typeof exp === "number" || typeof exp === "string"){
+                return [1,[exp],1];
+            }else{
+                rename_vars_in_formula_customized_aux(exp,origvars, renamedvars);
+                return [maxvarnr, exp, origvars];
+            }
+        }
+
+        function rename_vars_in_formula_customized_aux(exp,origvars, renamedvars){
+            var i, exp_tmp, tmp;
+            for(i = 1; i < exp.length; i++){
+                exp_tmp = exp[i];
+                tmp = typeof exp_tmp;
+                if(exp_tmp=='0'){
+                    exp[i] = false;
+                }else if(exp_tmp=='1'){
+                    exp[i] = true;
+                }else if(tmp === "string"||(Object.prototype.toString.apply(exp_tmp)==="[object String]")) {
+                    if (!renamedvars[exp_tmp]) {
+                        maxvarnr++;
+                        renamedvars[exp_tmp] = maxvarnr;
+                        origvars[maxvarnr] = exp_tmp;
+                        exp[i] = maxvarnr;
+                    } else {
+                        exp[i] = renamedvars[exp_tmp];
+                    }
+                } else {
+                    rename_vars_in_formula_customized_aux(exp_tmp, origvars, renamedvars);
+                }
+            }
+        }
+
+        function truthtable_customized(frm,count,origvars,customized){
+            var output,rowcount,i,n,r,varvals,val,pretruth,nexttruth,issame;
+            //把第一行的命题变元添加上
+            varvals = new Int32Array(count + 1);
+            issame=true;
+            output=[];
+            output.push("<table>");
+            output.push("<tr>");
+            for(var i=1;i<=count;i++){
+                output.push("<th>");
+                output.push(origvars[i]);
+                output.push("</th>");
+            }
+            output.push("<th>真值</th>");
+            output.push("</tr>");
+            //所有的真值可能性，依次添加
+            rowcount = Math.pow(2, count);
+            if (rowcount > 1024)
+                return parse_error("真值表包含 " + rowcount + " 排: 我们最多输出 1024 排。");
+            //每次根据输入的计算真值，放到可能真值后面即可
+            for(var i=0;i<rowcount;i++){
+                n=i;
+                output.push("<tr>");
+                for(var j=1;j<=count;j++){
+                    n = i >>> (count - j);
+                    r = n % 2;
+                    if (!r) varvals[j] = 0;
+                    else varvals[j] = 1;
+                    output.push("<td>");
+                    output.push(varvals[j]);
+                    output.push("</td>");
+                }
+                //通过varvals计算真值
+                val = print_eval_formula_customized(frm,customized,varvals);
+                if(val==-1) return parse_error("计算真值时出现未知错误");
+                output.push("<td>");
+                output.push(val);
+                output.push("</td>");
+                output.push("</tr>");
+                if(i==0) {pretruth = val; nexttruth = pretruth;}
+                else{
+                    nexttruth = val;
+                }
+                if(pretruth!=nexttruth) issame = false;
+            }
+            output=output.join("");
+            
+            if(issame==true){
+                if(pretruth=='1') return (parse_error("这是一个永真式"));
+                if(pretruth=='0') return (parse_error("这是一个永假式"));
+            }
+            return output;
+        }
+
+        function print_eval_formula_customized(frm,customized,varvals){
+            var op,tmp,tmp2,res,j;
+            tmp = typeof frm;
+            if (tmp === "number") return varvals[frm];
+            if(tmp === "boolean"){
+                if(frm) return 1;
+                else return 0;
+            }
+            op = frm[0];
+            if (op === "-") {
+                tmp = print_eval_formula_customized(frm[1],customized, varvals);
+                tmp = Number(tmp);
+                if (tmp === 1) res = 0;
+                else res = 1;
+                return res;
+            } else if (op === "∨") {
+                res = 0;
+                for (j = 1; j < frm.length; j++) {
+                    tmp = print_eval_formula_customized(frm[j],customized, varvals);
+                    tmp = Number(tmp);
+                    if (tmp === 1) res = 1;
+                }
+                return res;
+            } else if (op === "∧") {
+                res = 1;
+                for (j = 1; j < frm.length; j++) {
+                    tmp = print_eval_formula_customized(frm[j],customized, varvals);
+                    tmp = Number(tmp);
+                    if (tmp === 0) res = 0;
+                }
+                return res;
+            } else if (op === "→") {
+                res = 0;
+                for (j = 1; j < frm.length - 1; j++) {
+                    tmp = print_eval_formula_customized(frm[j],customized, varvals);
+                    tmp = Number(tmp);
+                    if (tmp === 0) res = 1;
+                }
+                tmp = print_eval_formula_customized(frm[frm.length - 1],customized, varvals);
+                tmp = Number(tmp);
+                if (tmp === 1) res = 1;
+                return res;
+            } else if (op === "↔") {
+                res = 1;
+                tmp = print_eval_formula_customized(frm[1],customized, varvals);
+                tmp = Number(tmp);
+                for (j = 2; j < frm.length; j++) {
+                    tmp2 = print_eval_formula_customized(frm[j],customized, varvals);
+                    tmp2 = Number(tmp2);
+                    if (tmp !== tmp2) res = 0;
+                }
+                return res;
+            } else if (op === "⊕") {
+                tmp = print_eval_formula_customized(frm[1],customized, varvals);
+                tmp = Number(tmp);
+                tmp2 = print_eval_formula_customized(frm[2],customized, varvals);
+                tmp2 = Number(tmp2);
+                tmp = tmp + tmp2;
+                if (tmp === 1) res = 1;
+                else res = 0;
+                return res;
+            }else{
+                var number_of_customized,position_of_customized;
+                tmp = is_customized(op,customized);
+                if(tmp[0]){
+                    number_of_customized = tmp[1];
+                    position_of_customized=0;
+                    for (j = 1; j < frm.length; j++) {
+                        tmp=print_eval_formula_customized(frm[j],customized, varvals);
+                        tmp = Number(tmp);
+                        position_of_customized=position_of_customized+Math.pow(2,customized[number_of_customized][1][0]-j)*tmp;
+                    }
+                    return customized[number_of_customized][2][0][position_of_customized];
+                }else{
+                    return -1;
+                }
+            }
+            return -1; // 发生错误
+        }
+
+
+        function print_truthtable(data) {
+            var tmp, count, frm, origvars, res;
+            if (!data) return "";
+            tmp = rename_vars_in_formula(data); //区分相同变量
+            count = tmp[0];
+            frm = tmp[1];
+            origvars = tmp[2];
+            res = truthtable(frm, count, origvars);
+            return res;
+        }
+
+        function truthtable(frm, maxvarnr, origvars) {
+            var rowcount, v, val, i, j, k, n, r, s, s2, frmstr, row, pretruth, nexttruth, issame;
+            var varvals;
+            var reslst, res;
+            varvals = new Int32Array(maxvarnr + 1);
+            reslst = [];
+            v = [];
+            issame = true;
+
+            printlst = []; // 全局使用 add_print_pos_to_formula
+            printlen = 0; // 全局使用 add_print_pos_to_formula
+
+            frm = add_print_pos_to_formula(frm, origvars, 0);
+            frmstr = printlst.join("");
+            frmstr = frmstr.replace(/\"/g, "");
+            printarray = [];
+            for (i = 0; i < frmstr.length; i++) printarray.push("&nbsp;");
+
+            for (k = 1; k <= maxvarnr; k++) v.push(origvars[k]);
+            s = v.join(" ") + " | " + frmstr;
+            reslst.push(s);
+
+            s2 = "";
+            for (k = 0; k < s.length; k++) s2 += "&ndash;";
+            reslst.push(s2);//前两行画出来
+
+            rowcount = Math.pow(2, maxvarnr);//二的变元次幂，即行数，即真值数目
+            if (rowcount > 1024)
+                return "真值表包含 " + rowcount + " 排: 我们最多输出 1024 排。";
+            for (i = 0; i < rowcount; i++) {
+                v = [];
+                n = i;
+                for (j = 1; j <= maxvarnr; j++) {
+                    n = i >>> (maxvarnr - j);
+                    r = n % 2;
+                    if (!r) varvals[j] = 0;
+                    else varvals[j] = 1;
+                    v.push(varvals[j]);
+                    s = "";
+                    for (k = 0; k < origvars[j].length; k++) s += "&nbsp;";
+                    v.push(s);
+                }
+                //alert(frm);
+                val = print_eval_formula(frm, varvals, 0);
+                if(i==0) {pretruth = val; nexttruth = pretruth;}
+                else{
+                    nexttruth = val;
+                }
+                if(pretruth!=nexttruth) issame = false;
+                s = printarray.join("");
+                v.push("&#124; ");
+                v.push(s);
+                reslst.push(v.join(""));
+            }
+            if(issame==true){
+                if(pretruth=='1') return (parse_error("这是一个永真式"));
+                if(pretruth=='0') return (parse_error("这是一个永假式"));
+            }//要改
+            res = reslst.join("\n");
+            return res;
+        }
+        /* add_print_pos_to_formula is used for �reparing to
+        print truth table rows: 
+            - it pushes all printable strings to a list printlst 
+            (to be used as an ordinary printed formula after join.(""))
+            - increases the length of printlen correspondingly. 
+            - returns the frm with each sublist led by operator augmented with an 
+            integer indicating printing position: right after the operation.
+        
+        Takes:
+            data - a formula like ["&",["&",["->","a",20],"a"],["-",20]] 
+            origvars - array containing for all vars in the frm the original var, like
+            [null,"x",20]. If empty, variables in data area used directly.
+            depth - current depth in the formula tree
+        */
+        function add_print_pos_to_formula(data, origvars, depth) {
+            var tmp, nr, s, op, i, lst, oppos;
+            tmp = typeof data;
+            if (!data) return;
+
+            if (tmp === "number") {
+                nr = data;
+                
+                if (data < 0) {
+                    printlst.push("¬");
+                    printlen++;
+                    nr = 0 - data;
+                }
+                tmp = origvars[nr];
+                if (tmp) {
+                    nr = tmp
+                }
+                s = String(nr);
+                printlst.push(s);
+                printlen += s.length;
+                return data;
+            } else if (tmp === "string") {
+                printlst.push(data);
+                printlen += data.length;
+                return data;
+            }
+            // 当data是一个列表的时候
+            if (data.length < 2) return null; // 不应该发生
+            op = data[0];
+            if (op === "-") {
+                printlst.push("¬");
+                oppos = printlen;
+                printlen++;
+                tmp = typeof data[1];
+                return ["-", oppos, add_print_pos_to_formula(data[1], origvars, depth + 1)];
+            } else {
+                lst = [op, 0];
+                if (depth > 0) {
+                    printlst.push("(");
+                    printlen += 1;
+                }
+                for (i = 1; i < data.length; i++) {
+                    lst.push(add_print_pos_to_formula(data[i], origvars, depth + 1));
+                    if (i < data.length - 1) {
+                        printlst.push(" " + op + " ");
+                        oppos = printlen + 1;
+                        printlen += op.length + 2;
+                    }
+                }
+                if (depth > 0) {
+                    printlst.push(")");
+                    printlen += 1;
+                }
+                lst[1] = oppos;
+                return lst;
+            }
+        }
+
+        function print_eval_formula(frm, varvals, depth) {
+            var op, oppos, j, tmp, tmp2, res;
+            tmp = typeof frm;
+            if (tmp === "number") return varvals[frm];
+            op = frm[0];
+            oppos = maxvarnr;
+            if (op === "-") {
+				
+                tmp = print_eval_formula(frm[2], varvals, depth + 1);
+                if (tmp === 1) res = 0;
+                else res = 1;
+                printarray[oppos] = valfmt(res, depth);
+                return res;
+            } else if (op === "∨") {
+                res = 0;
+                for (j = 2; j < frm.length; j++) {
+                    tmp = print_eval_formula(frm[j], varvals, depth + 1);
+                    if (tmp === 1) res = 1;
+                }
+                printarray[oppos] = valfmt(res, depth);
+                return res;
+            } else if (op === "∧") {
+                res = 1;
+                for (j = 2; j < frm.length; j++) {
+                    tmp = print_eval_formula(frm[j], varvals, depth + 1);
+                    if (tmp === 0) res = 0;
+                }
+                printarray[oppos] = valfmt(res, depth);
+                return res;
+            } else if (op === "→") {
+                res = 0;
+                for (j = 2; j < frm.length - 1; j++) {
+                    tmp = print_eval_formula(frm[j], varvals);
+                    if (tmp === 0) res = 1;
+                }
+                tmp = print_eval_formula(frm[frm.length - 1], varvals, depth + 1);
+                if (tmp === 1) res = 1;
+                printarray[oppos] = valfmt(res, depth);
+                return res;
+            } else if (op === "↔") {
+                res = 1;
+                tmp = print_eval_formula(frm[2], varvals, depth + 1);
+                for (j = 3; j < frm.length; j++) {
+                    tmp2 = print_eval_formula(frm[j], varvals, depth + 1);
+                    if (tmp !== tmp2) res = 0;
+                }
+                printarray[oppos] = valfmt(res, depth);
+                return res;
+            } else if (op === "⊕") {
+                tmp = print_eval_formula(frm[2], varvals, depth + 1);
+                tmp2 = print_eval_formula(frm[3], varvals, depth + 1);
+                tmp = tmp + tmp2;
+                if (tmp === 1) res = 1;
+                else res = 0;
+                printarray[oppos] = valfmt(res, depth);
+                return res;
+            }
+            return -1; // 发生错误
+        }
+
+        function valfmt(s, depth) {
+            if (depth == 0) return "<b>" + String(s) + "</b>";
+        }
+
+        /*=========================基础支持模块=======================*/
+        //getElementById缩写
+        function gid(x) {
+            return document.getElementById(x);
+        }
+
+        //去除左右空格与无效字符
+        function trim(s) {
+            return trimRight(trimLeft(s));
+        }
+
+        function trimLeft(s) {
+            if (s == null) {
+                return "";
+            }
+            var whitespace = new String(" \t\n\r");
+            var str = new String(s);
+            if (whitespace.indexOf(str.charAt(0)) != -1) {
+                var j = 0,
+                    i = str.length;
+                while (j < i && whitespace.indexOf(str.charAt(j)) != -1) {
+                    j++;
+                }
+                str = str.substring(j, i);
+            }
+            return str;
+        }
+          function str2int(in_str) {
+            var out_num = 0;
+            var pos = in_str.indexOf('1');
+            if (pos < 0){
+                return out_num;
+            }
+            out_num = 1;
+            for (var i=pos + 1; i<in_str.length; i++){
+                var ch = in_str.charAt(i);
+                out_num = out_num * 2;
+                if (ch == '1'){
+                    out_num = out_num + 1;
+                }
+            }
+            return out_num;
+        }
+        function str_left_move(str, num) {
+            var out_str = "";
+            var len_str = str.length;
+            for (var i=0; i<len_str; i++){
+                var cur_pos = (i + num) % len_str;
+                out_str += str[cur_pos];
+            }
+            return out_str;
+        }
+        function array_left_move(cur_array, num) {
+            var new_array = [];
+            var len_array = cur_array.length;
+            for (var i=0; i<len_array; i++){
+                var cur_pos = (i + num) % len_array;
+                new_array.push(cur_array[cur_pos]);
+            }
+            return new_array;
+        }
+        function pq_fun(p_str, q_str, num, func){
+            var result_list = [];
+            var result_gen_list = [];
+            var p_num_str = '#' + String(str2int(p_str));
+            var q_num_str = '#' + String(str2int(q_str));
+            if (num == 0){
+                var result_str = "";
+                for(var i=0; i<p_str.length; i++){
+                    result_str += func[0];
+                }
+                result_list.push(result_str);
+                result_gen_list.push("");
+            }
+            else if (num == 1){
+                var result_str = "";
+                for(var i=0; i<p_str.length; i++){
+                    result_str += func[p_str[i] - '0'];
+                }
+                result_list.push(result_str);
+                result_gen_list.push(p_num_str);
+            }
+            else{
+                if (p_str == q_str){
+                    var result_str = "";
+                    var input_list = ["", "", "", ""];
+                    var input_num_list = [];
+                    for (var i = 0; i < 4; i++) {
+                        for (var ii = 0; ii<num; ii++) {
+                            input_list[i] += p_str[i];
+                        }
+                    }
+                    for (var i = 0; i < 4; i++) {
+                        result_str += func[str2int(input_list[i])];
+                    }
+                    for (var j = 0; j < num; j++){
+                        input_num_list.push(p_num_str);
+                    }
+                    result_list.push(result_str);
+                    result_gen_list.push(input_num_list.join(','));
+                }
+                else {
+                    for (var i = 1; i < num; i++) {
+                        //输入矩阵
+                        var input_list = ["", "", "", ""];
+                        var input_num_list = [];
+                        for (var ii = 0; ii < num; ii++) {
+                            if (ii < i) {
+                                for (var iii = 0; iii < 4; iii++) {
+                                    input_list[iii] += p_str[iii];
+                                }
+                                input_num_list.push(p_num_str);
+                            }
+                            else {
+                                for (var iii = 0; iii < 4; iii++) {
+                                    input_list[iii] += q_str[iii];
+                                }
+                                input_num_list.push(q_num_str);
+                            }
+                        }
+                        for (var j = 0; j < num; j++) {
+                            var result_str = "";
+                            for (var jj = 0; jj < 4; jj++){
+                                result_str += func[str2int(str_left_move(input_list[jj], j))];
+                            }
+                            var cur_input_num_list = array_left_move(input_num_list, j);
+                            result_gen_list.push(cur_input_num_list.join(','));
+                            result_list.push(result_str);
+                        }
+                    }
+                }
+            }
+            return [result_list, result_gen_list];
+        }
+        function opt_gen_str(gen_list, pos){
+            var gen_str = gen_list[pos];
+            var out_line = gen_str;
+            var match_num_list = gen_str.match(/#\d+/g);
+            while (match_num_list != null) {
+                for (var i = 0; i < match_num_list.length; i++) {
+                    var match_str = match_num_list[i];
+                    var cur_pos = parseInt(match_str.match(/\d+/));
+                    out_line = out_line.replace(new RegExp(match_str, "gm"), gen_list[cur_pos]);
+                }
+                match_num_list = out_line.match(/#\d+/g);
+            }
+            return out_line;
+        }
+
+        function trimRight(s) {
+            if (s == null)
+			   return "";
+            var whitespace = new String(" \t\n\r");
+            var str = new String(s);
+            if (whitespace.indexOf(str.charAt(str.length - 1)) != -1) {
+                var i = str.length - 1;
+                while (i >= 0 && whitespace.indexOf(str.charAt(i)) != -1) {
+                    i--;
+                }
+                str = str.substring(0, i + 1);
+            }
+            return str;
+        }
+
+        //清空输出模块
+        function clear_output() {
+            var output = document.getElementById(result_html_id);
+            output.innerHTML = "";
+        }
+		
+
+        //输出结果
+        function show_result(txt) {
+            append_to_place(txt, result_html_id);
+        }
+
+        //输出指定位置，输出合适格式
+        function append_to_place(txt, placeid) {
+            var place = document.getElementById(placeid);
+            var newcontent = document.createElement('div');
+            newcontent.innerHTML = txt;
+            while (newcontent.firstChild) {
+                place.appendChild(newcontent.firstChild);
+            }
+        }
+
+        //返回下一个有效字符所在位置，除去空格等
+        function parse_skip(txt, pos) {
+            var c;
+            while (pos < txt.length) {
+                c = txt.charAt(pos);
+                if (c === " " || c === "\t" || c === "\n" || c === "\r")
+				   pos++;
+                else break;
+            }
+            return pos;
+        }
+        //返回一行内下一个有效字符所在位置，除去空格等
+        function parse_skip_inline(txt, pos) {
+            var c;
+            while (pos < txt.length) {
+                c = txt.charAt(pos);
+                if (c === " " || c === "\t") pos++;
+                else break;
+            }
+            return pos;
+        }
+
+        function parse_error(txt) {
+            return ["error", txt];
+        }
+        //类型不符合要求
+        function err_data(data) {
+            if (typeof data !== "string" && data[0] === "error") return true;
+            else return false;
+        }
+
+        function parse_isatpos(txt, pos, str) { //判断txt中pos位置上，是否有与str相等的substring
+            if (str.length === 1) {
+                if (txt.charAt(pos) === str) return true;
+                else return false;
+            } else {
+                if (txt.substr(pos, str.length) === str) return true;
+                else return false;
+            }
+        }
+
+        function is_op(c){//判断为联接词
+            if(c=="¬"||c=="∧"||c=="∨"||c=="→"||c=="⊕"||c=="↔"){
+                return true;
+            }
+            return false;
+        }
+
+
+        function is_customized(s,customized){//判断一个字符串是否是一个新定义联结词
+            for(var i=0;i<customized.length;i++){
+                if(s==customized[i][0][0]) return [true,i];
+            }
+            return [false,-1];
+        }
+
+        function sharp_position(txt) { //返回#的位置
+            var pos, c, result;
+            pos = 0;
+            //假设前后均无无效字符，且#只且仅存在自定义逻辑连接词前
+		
+			//   pos= txt.indexof('#');
+		 
+           while (pos < txt.length) {
+                c = txt.charAt(pos);
+                if (c == '#') {
+                    break;
+                }
+                pos++;
+            }
+            return pos;
+        }
+
+        function split_customized(customized) { //返回新定义逻辑联结词结构化
+            var pos, tmp, tmp_var, tmp_num, tmp_truth, result, t;
+            pos = parse_skip(customized, 0);
+            result = [];
+            //获得名称和名称接下来的位置，如果出现错误则直接返回退出
+            while (pos < customized.length) {
+                tmp = isa_variable(customized, pos);
+                if (err_data(tmp)) {
+                    return tmp;
+                }
+                tmp_var = tmp[0];
+                pos = tmp[1];
+                //获取变元个数，并且检测错误
+                tmp = isa_num(customized, pos);
+                if (err_data(tmp)) {
+                    return tmp;
+                }
+                tmp_num = tmp[0];
+                pos = tmp[1];
+                //获取真值表最后一列，并且检测错误
+                tmp = isa_truth(customized, pos);
+                tmp_truth = tmp[0];
+                pos = tmp[1];
+                if (tmp_truth.length == Math.pow(2, tmp_num)) {
+                    //整合一个新定义逻辑连结词
+                    result.push([
+                        [tmp_var],
+                        [tmp_num],
+                        [tmp_truth]
+                    ]);
+                } else {
+                    result = parse_error("真值表输入错误");
+                    return result;
+                }
+            }
+            //加上一个对于重复定义名称的判断
+            for (var i = 0; i < result.length; i++) {
+                for (var j = i + 1; j < result.length; j++) {
+                    if (result[i][0][0] == result[j][0][0]) {
+                        result = parse_error("逻辑联结词  \"" + result[i][0] + "\"  重复定义！");
+                        return result;
+                    }
+                }
+            }
+            return result;
+        }
+
+        function isa_variable(customized, pos) { //判断命题变元，第二类逻辑联结词是否符合字母及数字构成的字符串且首字符是字母
+            var temp = pos;
+            var c = customized.charAt(temp);
+            var n = customized.charCodeAt(temp);
+            var v = null;
+            var result;
+            //首字符不是字母
+            if ((pos - temp) == 0 && !((n >= 65 && n <= 90) || (n >= 97 && n <= 122))) {
+                result = parse_error("新定义逻辑联结词以非字母开头");
+                return result;
+            }
+            while (true) {
+                c = customized.charAt(temp);
+                n = customized.charCodeAt(temp);
+                if (temp < customized.length && ((n >= 48 && n <= 57) || (n >= 65 && n <= 90) || (n >= 97 && n <= 122))) {
+                    temp++;
+                    continue;
+                }
+                if (temp > pos) {
+                    v = customized.substring(pos, temp);
+                    result = [v, temp];
+                    break;
+                }
+                break;
+            }
+            return result;
+        }
+
+        function isa_num(customized, pos) { //返回变元个数，并判断输入是否正确
+            pos = parse_skip_inline(customized, pos);
+            var result, c, n, c1, v;
+            c = customized.charAt(pos);
+            n = customized.charCodeAt(pos);
+            pos++;
+            c1 = customized.charAt(pos);
+            v = null;
+            if ((n > 48 && n <= 57) && (c1 == " " || c1 == "\t")) {
+                v = customized.substring(pos - 1, pos);
+                result = [v, pos];
+                return result;
+            }
+            result = parse_error("变元输入格式有错");
+            return result;
+        }
+
+        function isa_truth(customized, pos) { //返回真值表最后一列真值
+            var tmp, c, n, result, num;
+            pos = parse_skip_inline(customized, pos);
+            tmp = pos;
+            result = [];
+            while (tmp < customized.length) {
+                c = customized.charAt(tmp);
+                n = customized.charCodeAt(tmp);
+                //记录truth，push记录，并且进行错误检查。
+                if (n == 48 || n == 49) {
+                    result.push(c);
+                    tmp++;
+                    continue;
+                } else if (c == " " || c == "\t") {
+                    tmp++;
+                    continue;
+                } else {
+                    break;
+                }
+            }
+            result = [result, tmp];
+            return result;
+        }
+
+        function conjunction2exp(s){
+            var n = s.length;
+            var tmp;
+            if(s[n-1] != ')')//若最后不是）
+                return s;
+            var res = [];
+            var l, r;
+            for(var i=0; i<n; i++) {
+                if(s[i] == '(') {
+                    l = i; break;//记录（ 位置
+                }
+            }
+            res.push(s.slice(0, l)); //将（ 入栈
+            var prev = l+1;
+            for(var i=l+1; i<n-1; i++) {
+                if(s.charAt(i)==',') {
+                    res.push(conjunction2exp(s.slice(prev, i)));
+                    prev = i+1;
+                }
+                if(s.charAt(i) == '(') {
+                    var cnt = 0;
+                    for(var j=i; j<n; j++) {
+                        if(s[j] == '(')
+                            cnt++;
+                        if(s[j] == ')')
+                            cnt--;
+                        if(cnt == 0) {
+                            i = j;
+                            break;
+                        }
+                    }
+                }
+            }
+            res.push(conjunction2exp(s.slice(prev, n-1)));
+            return res;
+        }
+
+        function charge_customized(conj_exp,customized){
+            if(customized.length==0){
+                return parse_error("未定义联结词，但是调用自定义联结词")
+            }
+            var result,charge;
+            for(var j=0;j<conj_exp.length;j++){
+                if(typeof conj_exp[j]=== "string"){
+                    conj_exp[j]=conj_exp[j].trim();
+                    if(j==0){
+                        charge=is_customized(conj_exp[j],customized);
+                        if(!charge[0]){
+                            return (parse_error("调用未定义联结词！"));
+                        }
+                        //已经定义该联结词
+                        //判断变元个数是否符合格式
+                        if((conj_exp.length-1)!=customized[charge[1]][1][0]){
+                            return (parse_error("联结词内部变元个数不正确"));
+                        }
+                    }else{
+                        //应该为内部变元,用parse_expression_tree试一下
+                        charge = parse_expression_tree(conj_exp[j],customized,0);
+                        if(err_data(charge)){
+                            return charge;
+                        }
+                    }
+                }else if(typeof conj_exp[j]=== "number"){
+                    if(!(conj_exp[j]==1||conj_exp==0)){
+                        return (parse_error("0，1变元输入错误"));
+                    }
+                }else{
+                    result = charge_customized(conj_exp[j],customized)
+                    if(err_data(result)){
+                        return result;
+                    }
+                }
+            }
+            return true;
+        }
+        function generate_complete_set(){
+            var single_set = [];
+            var definition=[];
+            var count,rowcount,n,r,var_num,calculate_num,result,result_tmp;
+            calculate_num=0;
+            //首先生成所有可能的二元联结词
+            for(var_num=1;var_num<=2;var_num++){
+                count = Math.pow(2,var_num);
+                rowcount = Math.pow(2, count);
+                for(var i=0;i<rowcount;i++){
+                    n=i;
+                    definition = [];
+                    definition.push("F"+calculate_num);
+                    definition.push(var_num);
+                    calculate_num++;
+                    for(var j=1;j<=count;j++){
+                        n = i >>> (count - j);
+                        r = n % 2;
+                        if (!r) definition.push("0");
+                        else definition.push("1");
+                    }
+                    single_set.push(definition.join(" "));
+                }
+            }
+            //对所有可能的联结词的组合进行判断
+            result = [];
+            var combineList,dellist;
+            
+            for(var i=0;i<single_set.length;i++){
+                combineList=[];
+                dellist=[];
+                getCombination(single_set,i+1,0,[],0,combineList,dellist);
+                for(let j=0;j<combineList.length;j++){
+                    if(judge_complete_set_return(combineList[j])){
+                        result.push(combineList[j]);
+                        for(let k=0;k<dellist[j].length;k++){
+                            var tmp=single_set.indexOf(dellist[j][k])
+                            single_set.splice(tmp,1);
+                        }
+                    }
+                }
+            }
+            show_result(result.join("<br>"));
+        }
+        function getCombination(a, n, begin,b,index,combineList,dellist){
+            if(n == 0){//如果够n个数了，输出b数组
+                combineList.push("#"+b.join(" "));
+                dellist.push(b.slice(0));
+                return;
+            }
+
+            for(var j = begin; j < a.length; j++){
+                b[index] = a[j];
+                getCombination(a, n-1, j+1, b, index+1,combineList,dellist);
+            }
+        }
+    </script>
+</head>
+
+<body style="font-family: arial,helvetica,sans-serif; color: #333333; margin: 20px;">
+    
+    
+    <form>
+        <textarea class="form-control" id="textinput" style="height: 200px; width: 800px; margin-bottom: 20px;">F(p, q, F(p, p, ff(p)))→p #F 3 0 0 0 0 0 0 1 1 ff 1 0 1</textarea>
+        <p>
+            <div style="display: inline-block;">
+                <button class="btn btn-small btn-danger" onclick="judge_formula(gid('textinput').value); return false;"
+                    style="height: 36px; color: red;">判断公式可满足</button>
+                <p>
+            </div>
+            <p>
+                <div style="display: inline-block;">
+                    <button class="btn btn-small btn-danger" onclick="judge_complete_set(gid('textinput').value); return false;"
+                        style="height: 36px; color: red;">判断完全集</button>
+                    <p>
+                </div>
+                <p>
+                    <div style="display: inline-block;">
+                        <button class="btn btn-small btn-danger" onclick="generate_complete_set(); return false;"
+                            style="height: 36px; color: red;">不超出二元的逻辑联结词构成的所有的逻辑联结词的最小完全集</button>
+                        <p>
+                    </div>
+    </form>
+    <h2>结果</h2>
+    <div id="result"></div>
+</body>
